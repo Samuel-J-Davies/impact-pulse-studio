@@ -30,6 +30,9 @@ body { -webkit-font-smoothing: antialiased; }
 .flex { display: flex; }
 .grid { display: display; display: grid; }
 .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.py-0\.5 { padding-top: 2px; padding-bottom: 2px; }
+.hover-underline:hover { text-decoration: underline; }
+details > summary { list-style: revert; }
 .max-h-80 { max-height: 320px; }
 .overflow-y-auto { overflow-y: auto; }
 button:disabled { opacity: 0.7; cursor: default; }
