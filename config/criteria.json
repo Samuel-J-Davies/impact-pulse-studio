@@ -1,0 +1,15 @@
+{
+  "regionsIn": ["Africa", "Latin America", "Southeast Asia", "South Asia", "India", "Emerging markets"],
+  "regionsOut": ["United States", "Western Europe", "Developed markets"],
+  "themes": [
+    "Clean energy / climate",
+    "Agribusiness",
+    "Healthcare",
+    "WASH",
+    "Inclusive finance / microfinance",
+    "SME finance",
+    "Housing",
+    "Education"
+  ],
+  "rules": "INCLUDE only the fundraising of the fund itself: launches, first/final closes, LP commitments into a fund.\nEXCLUDE investments a fund makes into a company (Series A/B, debt facilities, single-company rounds), and funds focused on developed markets."
+}

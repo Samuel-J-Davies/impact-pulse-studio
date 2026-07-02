@@ -1,0 +1,50 @@
+[
+  {
+    "name": "ImpactAlpha",
+    "url": "https://news.impactalpha.com/feed",
+    "tier": 2,
+    "active": true,
+    "verified": false,
+    "notes": "Found via search (ImpactAlpha's own published RSS link). Not live-tested from this environment — confirm it returns items after first deploy."
+  },
+  {
+    "name": "AgFunderNews",
+    "url": "",
+    "tier": 2,
+    "active": false,
+    "verified": false,
+    "notes": "Could not confirm a working feed URL. Check agfundernews.com for a /feed or /rss link, or view page source for a <link type=\"application/rss+xml\"> tag."
+  },
+  {
+    "name": "IFC (World Bank Group) news",
+    "url": "",
+    "tier": 1,
+    "active": false,
+    "verified": false,
+    "notes": "Primary-source DFI announcements are the highest-precision feed for fund closes. Check ifc.org press releases / newsroom for an RSS or Atom link."
+  },
+  {
+    "name": "British International Investment (BII)",
+    "url": "",
+    "tier": 1,
+    "active": false,
+    "verified": false,
+    "notes": "Check bii.co.uk news page for an RSS link."
+  },
+  {
+    "name": "FMO",
+    "url": "",
+    "tier": 1,
+    "active": false,
+    "verified": false,
+    "notes": "Check fmo.nl press releases page for an RSS link."
+  },
+  {
+    "name": "Devex",
+    "url": "",
+    "tier": 2,
+    "active": false,
+    "verified": false,
+    "notes": "Check devex.com for a topic-specific RSS feed (funding/finance tag)."
+  }
+]
