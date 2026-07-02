@@ -9,6 +9,35 @@ export const config = { maxDuration: 60 }; // Vercel Hobby cap; Pro allows more 
 // string against your Anthropic console — model names change over time.
 const FILTER_MODEL = process.env.FILTER_MODEL || 'claude-sonnet-5';
 
+// The filter returns its answer by calling this tool, so the API hands us
+// already-valid structured JSON instead of hand-written text we have to parse.
+const REPORT_TOOL = {
+  name: 'report_funds',
+  description: 'Report the impact-fund fundraising stories found, with duplicates clustered.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      groups: {
+        type: 'array',
+        description: 'One entry per distinct fund event. Cluster duplicate coverage into a single entry.',
+        items: {
+          type: 'object',
+          properties: {
+            members: { type: 'array', items: { type: 'integer' }, description: 'Article numbers covering this event.' },
+            decision: { type: 'string', enum: ['include', 'borderline'] },
+            manager: { type: 'string' },
+            fund: { type: 'string' },
+            region: { type: 'string' },
+            theme: { type: 'string' },
+          },
+          required: ['members', 'decision'],
+        },
+      },
+    },
+    required: ['groups'],
+  },
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -20,15 +49,8 @@ export default async function handler(req, res) {
   }
 
   const {
-    keywords = [],
-    sources = [],
-    days = 8,
-    maxItems = 200,
-    criteriaBlock = '',
-    rememberSeen = true,
-    searchManagers = true,
-    managerBatch = 25,
-    richPreviews = true,
+    keywords = [], sources = [], days = 8, maxItems = 200, criteriaBlock = '',
+    rememberSeen = true, searchManagers = true, managerBatch = 25, richPreviews = true,
   } = req.body || {};
 
   const minDate = new Date();
@@ -45,7 +67,6 @@ export default async function handler(req, res) {
     managerInfo = { from, to, total, batches };
     batch.forEach((m) => jobs.push({ label: `manager: ${m}`, url: managerQuery(m, days), tier: 3 }));
   }
-
   if (!jobs.length) return res.status(400).json({ error: 'Nothing to search. Add a keyword or source, or enable manager search.' });
 
   // ---- 2. Fetch all feeds with bounded concurrency ----
@@ -81,12 +102,11 @@ export default async function handler(req, res) {
 
   collected.sort((a, b) => b.pubDate - a.pubDate);
   const forFilter = collected.slice(0, Number(maxItems));
-
   if (!forFilter.length) {
     return res.status(200).json({ collectedCount, newCount: 0, included: [], borderline: [], feedErrors, persistentDedup, managerInfo });
   }
 
-  // ---- 5. Filter + cluster in one Claude call (returns JSON, not prose) ----
+  // ---- 5. Filter + cluster via tool call (structured, no fragile text parsing) ----
   const list = forFilter
     .map((it, i) => `${i + 1}. ${it.title}  [${it.source} · ${it.pubDate.toISOString().slice(0, 10)}]`)
     .join('\n');
@@ -96,14 +116,12 @@ export default async function handler(req, res) {
     `fundraising of an investment FUND meeting every criterion below.\n\n` + criteriaBlock +
     `\n\nEDGE CASES:\n` +
     `- "Fund X reaches first close" / "LPs commit to Fund Y" -> include.\n` +
-    `- "Fund X invests $10M in Company Y" -> exclude (that is a portfolio investment, not fund fundraising).\n` +
+    `- "Fund X invests $10M in Company Y" -> exclude (portfolio investment, not fund fundraising).\n` +
     `- "Startup raises Series A from Fund W" -> exclude.\n` +
     `- Fund clearly focused on US / Western Europe / developed markets -> exclude.\n` +
     `- Unsure -> mark "borderline" rather than dropping.\n\n` +
-    `CLUSTER duplicates: if several articles cover the same fund event, put their numbers in one group's "members".\n\n` +
-    `Return ONLY JSON, no prose, no code fences:\n` +
-    `{"groups":[{"members":[<article numbers>],"decision":"include|borderline","manager":"","fund":"","region":"","theme":""}]}\n` +
-    `Use "" for unknown fields. Omit excluded articles entirely.`;
+    `Cluster duplicate coverage of the same fund event into one group. Report every kept story by calling report_funds. ` +
+    `Omit excluded articles.`;
 
   let parsed;
   try {
@@ -111,45 +129,50 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: FILTER_MODEL, max_tokens: 3000, system: systemPrompt,
+        model: FILTER_MODEL, max_tokens: 8000, system: systemPrompt,
+        tools: [REPORT_TOOL], tool_choice: { type: 'tool', name: 'report_funds' },
         messages: [{ role: 'user', content: 'ARTICLES:\n' + list }],
       }),
     });
     const data = await upstream.json();
     if (!upstream.ok) throw new Error(data?.error?.message || 'Anthropic API error');
-    const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').replace(/```json|```/g, '').trim();
-    parsed = JSON.parse(text);
+
+    const toolBlock = (data.content || []).find((b) => b.type === 'tool_use' && b.name === 'report_funds');
+    if (toolBlock?.input?.groups) {
+      parsed = toolBlock.input;
+    } else {
+      // Fallback: some responses may include JSON as text — try to salvage.
+      const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').replace(/```json|```/g, '').trim();
+      parsed = JSON.parse(text);
+    }
+    if (!Array.isArray(parsed.groups)) throw new Error('No groups returned.');
   } catch (e) {
     return res.status(500).json({ error: 'Filter step failed: ' + String(e.message || e) });
   }
 
   // ---- 6. Resolve each group to its best-tier article ----
-  function resolveGroup(g) {
-    const members = (g.members || [])
-      .map((n) => forFilter[n - 1])
-      .filter(Boolean)
-      .sort((a, b) => a.tier - b.tier || b.pubDate - a.pubDate); // best tier, then newest
+  const groups = parsed.groups.map((g) => {
+    const members = (g.members || []).map((n) => forFilter[n - 1]).filter(Boolean)
+      .sort((a, b) => a.tier - b.tier || b.pubDate - a.pubDate);
     if (!members.length) return null;
     const best = members[0];
     return {
       title: best.title, link: best.link, source: best.source, image: best.image,
       pubDate: best.pubDate, tier: best.tier,
       manager: g.manager || '', fund: g.fund || '', region: g.region || '', theme: g.theme || '',
+      decision: g.decision || 'include',
       alsoCoveredBy: members.slice(1).map((m) => m.source).filter((v, i, a) => a.indexOf(v) === i),
-      _key: best.key,
     };
-  }
+  }).filter(Boolean);
 
-  const groups = (parsed.groups || []).map(resolveGroup).filter(Boolean);
-  const included = groups.filter((_, i) => (parsed.groups[i].decision || 'include') !== 'borderline');
-  const borderline = groups.filter((_, i) => (parsed.groups[i].decision || '') === 'borderline');
+  const included = groups.filter((g) => g.decision !== 'borderline');
+  const borderline = groups.filter((g) => g.decision === 'borderline');
 
   // ---- 7. Rich previews for the (small) selected set, best-effort ----
   if (richPreviews) {
-    const selected = [...included, ...borderline];
-    await pool(selected, async (item) => {
+    await pool([...included, ...borderline], async (item) => {
       const p = await fetchPreview(item.link);
-      if (p.finalUrl) item.link = p.finalUrl;         // resolve Google News redirect to the real article
+      if (p.finalUrl) item.link = p.finalUrl;
       if (!item.image && p.image) item.image = p.image;
       if (p.description) item.description = p.description;
       if (p.siteName && (!item.source || item.source.startsWith('Google News'))) item.source = p.siteName;
@@ -160,8 +183,5 @@ export default async function handler(req, res) {
   // ---- 8. Remember what we delivered ----
   if (rememberSeen) await markSeen(forFilter.map((c) => c.key));
 
-  return res.status(200).json({
-    collectedCount, newCount: forFilter.length,
-    included, borderline, feedErrors, persistentDedup, managerInfo,
-  });
+  return res.status(200).json({ collectedCount, newCount: forFilter.length, included, borderline, feedErrors, persistentDedup, managerInfo });
 }

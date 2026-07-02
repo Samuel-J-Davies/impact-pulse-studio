@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import Head from "next/head";
-import { Plus, X, Play, Copy, Check, ChevronDown, ChevronRight, CircleDot, Mail, AlertTriangle, ExternalLink, RotateCcw } from "lucide-react";
+import { Plus, X, Play, Copy, Check, ChevronDown, ChevronRight, CircleDot, Link2, AlertTriangle, ExternalLink, RotateCcw } from "lucide-react";
 import defaultKeywords from "../config/keywords.json";
 import defaultSources from "../config/sources.json";
 import defaultCriteria from "../config/criteria.json";
@@ -32,9 +32,7 @@ export default function ImpactPulseApp() {
   const [stage, setStage] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const [emailTo, setEmailTo] = useState("");
-  const [emailStatus, setEmailStatus] = useState("");
+  const [copied, setCopied] = useState("");
   const [collapsed, setCollapsed] = useState(false);
 
   // Persist config across visits (real browser storage — this is a deployed app, not a sandbox).
@@ -51,7 +49,6 @@ export default function ImpactPulseApp() {
         if (saved.regionsOut) setRegionsOut(saved.regionsOut);
         if (saved.themes) setThemes(saved.themes);
         if (typeof saved.rules === "string") setRules(saved.rules);
-        if (saved.emailTo) setEmailTo(saved.emailTo);
       }
     } catch {}
   }, []);
@@ -59,10 +56,10 @@ export default function ImpactPulseApp() {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify({
         days, maxItems, rememberSeen, searchManagers, managerBatch, richPreviews,
-        keywords, sources, regionsIn, regionsOut, themes, rules, emailTo,
+        keywords, sources, regionsIn, regionsOut, themes, rules,
       }));
     } catch {}
-  }, [days, maxItems, rememberSeen, searchManagers, managerBatch, richPreviews, keywords, sources, regionsIn, regionsOut, themes, rules, emailTo]);
+  }, [days, maxItems, rememberSeen, searchManagers, managerBatch, richPreviews, keywords, sources, regionsIn, regionsOut, themes, rules]);
 
   const activeThemes = themes.filter((t) => t.on).map((t) => t.label);
   const criteriaBlock = useMemo(() => [
@@ -82,7 +79,7 @@ export default function ImpactPulseApp() {
   }
 
   async function run() {
-    setError(""); setResult(null); setEmailStatus(""); setRunning(true); setCollapsed(true);
+    setError(""); setResult(null); setRunning(true); setCollapsed(true);
     setStage(searchManagers ? "Searching keywords, sources, and a batch of managers…" : "Searching keywords and sources…");
     const t = setTimeout(() => setStage(richPreviews ? "Filtering, clustering duplicates, building previews…" : "Filtering and clustering duplicates…"), 4000);
     try {
@@ -108,22 +105,17 @@ export default function ImpactPulseApp() {
     if (result.borderline?.length) md += "\n\n**Borderline — review**\n\n" + result.borderline.map(row).join("\n");
     return md;
   }
-  function copyDigest() {
-    navigator.clipboard?.writeText(toMarkdown());
-    setCopied(true); setTimeout(() => setCopied(false), 1200);
+  function selectedItems() {
+    if (!result) return [];
+    return [...(result.included || []), ...(result.borderline || [])];
   }
-  async function sendEmail() {
-    if (!result || !emailTo.trim()) return;
-    setEmailStatus("sending");
-    try {
-      const res = await fetch("/api/send-email", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: emailTo, included: result.included, borderline: result.borderline }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Send failed");
-      setEmailStatus("sent");
-    } catch (e) { setEmailStatus(String(e.message || e)); }
+  function copy(kind) {
+    let text = "";
+    if (kind === "links") text = selectedItems().map((it) => it.link).join("\n");
+    else if (kind === "titledLinks") text = selectedItems().map((it) => `${it.title}\n${it.link}`).join("\n\n");
+    else text = toMarkdown();
+    navigator.clipboard?.writeText(text);
+    setCopied(kind); setTimeout(() => setCopied(""), 1400);
   }
 
   return (
@@ -266,21 +258,27 @@ export default function ImpactPulseApp() {
               </>
             )}
 
-            <div className="flex items-center gap-3 mt-5 flex-wrap">
-              <button onClick={copyDigest} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line }}>{copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copied markdown" : "Copy as markdown"}</button>
-              <div className="flex items-center gap-2">
-                <input value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="you@tameo.solutions" className="px-2 py-1.5 rounded border text-sm outline-none" style={{ borderColor: C.line, width: 240 }} />
-                <button onClick={sendEmail} disabled={emailStatus === "sending" || !emailTo.trim()} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line }}><Mail size={14} /> {emailStatus === "sending" ? "Sending…" : "Email digest"}</button>
+            {selectedItems().length > 0 && (
+              <div className="flex items-center gap-2 mt-5 flex-wrap">
+                <button onClick={() => copy("links")} className="inline-flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded text-white" style={{ background: C.ink }}>
+                  {copied === "links" ? <Check size={14} /> : <Link2 size={14} />} {copied === "links" ? "Copied" : "Copy links"}
+                </button>
+                <button onClick={() => copy("titledLinks")} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line }}>
+                  {copied === "titledLinks" ? <Check size={14} /> : <Copy size={14} />} {copied === "titledLinks" ? "Copied" : "Copy titles + links"}
+                </button>
+                <button onClick={() => copy("table")} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line }}>
+                  {copied === "table" ? <Check size={14} /> : <Copy size={14} />} {copied === "table" ? "Copied" : "Copy table"}
+                </button>
+                <span className="text-xs" style={{ color: C.muted }}>{selectedItems().length} link{selectedItems().length === 1 ? "" : "s"}</span>
               </div>
-            </div>
-            {emailStatus === "sent" && <div className="text-sm mt-2" style={{ color: C.include }}>Sent.</div>}
-            {emailStatus && !["sending", "sent"].includes(emailStatus) && <div className="text-sm mt-2 whitespace-pre-wrap" style={{ color: C.exclude }}>{emailStatus}</div>}
+            )}
           </Panel>
         )}
 
         <p className="text-xs mt-6" style={{ color: C.muted }}>
           Filter model is set by the FILTER_MODEL env var (default claude-sonnet-5). Filter calls run server-side — the Anthropic key never reaches the browser.
           Manager watchlist ({managersList.length}) is searched in a weekly-rotating batch to stay within serverless limits. Settings are saved in this browser.
+          "Copy links" gives you the selected stories' URLs, one per line, ready to paste into LinkedIn.
         </p>
       </div>
     </div>
