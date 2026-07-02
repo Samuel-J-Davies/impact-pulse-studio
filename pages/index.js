@@ -58,7 +58,12 @@ export default function ImpactPulseApp() {
         setManagerBatch(saved.managerBatch ?? 25); setRichPreviews(saved.richPreviews ?? true);
         if (saved.keywords) setKeywords(saved.keywords);
         if (Array.isArray(saved.managers)) setManagers(saved.managers);
-        if (saved.sources) setSources(saved.sources);
+        if (saved.sources) {
+          // Keep the user's sources, but append any newly-shipped curated sources they don't have yet.
+          const names = new Set(saved.sources.map((s) => s.name));
+          const additions = defaultSources.filter((d) => !names.has(d.name));
+          setSources(additions.length ? [...saved.sources, ...additions.map((s) => ({ ...s }))] : saved.sources);
+        }
         if (saved.regionsIn) setRegionsIn(saved.regionsIn);
         if (saved.regionsOut) setRegionsOut(saved.regionsOut);
         if (saved.themes) setThemes(saved.themes);

@@ -5,15 +5,31 @@
     "tier": 2,
     "active": true,
     "verified": false,
-    "notes": "Found via search (ImpactAlpha's own published RSS link). Not live-tested from this environment — confirm it returns items after first deploy."
+    "notes": "ImpactAlpha's feed blocks some automated fetchers. If it returns nothing after deploy, try the topic feed https://impactalpha.com/browse/impact-investing/feed/ instead."
   },
   {
-    "name": "AgFunderNews",
-    "url": "",
+    "name": "NextBillion",
+    "url": "https://nextbillion.net/tags/impact-investing/feed/",
     "tier": 2,
-    "active": false,
+    "active": true,
+    "verified": true,
+    "notes": "Emerging-markets social enterprise & impact investing news. Good fit; verified returning items."
+  },
+  {
+    "name": "IIX Global",
+    "url": "https://iixglobal.com/feed/",
+    "tier": 2,
+    "active": true,
+    "verified": true,
+    "notes": "Impact Investment Exchange — women/underserved, emerging markets. Verified returning items."
+  },
+  {
+    "name": "Impact Investing Institute",
+    "url": "https://www.impactinvest.org.uk/latest/news/feed/",
+    "tier": 2,
+    "active": true,
     "verified": false,
-    "notes": "Could not confirm a working feed URL. Check agfundernews.com for a /feed or /rss link, or view page source for a <link type=\"application/rss+xml\"> tag."
+    "notes": "UK industry body news feed. Reputable; confirm it returns items after first run."
   },
   {
     "name": "IFC (World Bank Group) news",
@@ -21,7 +37,7 @@
     "tier": 1,
     "active": false,
     "verified": false,
-    "notes": "Primary-source DFI announcements are the highest-precision feed for fund closes. Check ifc.org press releases / newsroom for an RSS or Atom link."
+    "notes": "PRIORITY: primary DFI announcements are the highest-precision source for fund closes. Find an RSS/Atom link on ifc.org's newsroom and paste it here."
   },
   {
     "name": "British International Investment (BII)",
@@ -29,7 +45,7 @@
     "tier": 1,
     "active": false,
     "verified": false,
-    "notes": "Check bii.co.uk news page for an RSS link."
+    "notes": "PRIORITY: check bii.co.uk news page for an RSS link."
   },
   {
     "name": "FMO",
@@ -37,14 +53,6 @@
     "tier": 1,
     "active": false,
     "verified": false,
-    "notes": "Check fmo.nl press releases page for an RSS link."
-  },
-  {
-    "name": "Devex",
-    "url": "",
-    "tier": 2,
-    "active": false,
-    "verified": false,
-    "notes": "Check devex.com for a topic-specific RSS feed (funding/finance tag)."
+    "notes": "PRIORITY: check fmo.nl press releases page for an RSS link."
   }
 ]
