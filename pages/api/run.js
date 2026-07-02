@@ -51,7 +51,10 @@ export default async function handler(req, res) {
   const {
     keywords = [], sources = [], days = 8, maxItems = 200, criteriaBlock = '',
     rememberSeen = true, searchManagers = true, managerBatch = 25, richPreviews = true,
+    managers = null,
   } = req.body || {};
+
+  const watchlist = Array.isArray(managers) && managers.length ? managers.filter(Boolean) : managersList;
 
   const minDate = new Date();
   minDate.setDate(minDate.getDate() - Number(days));
@@ -62,8 +65,8 @@ export default async function handler(req, res) {
   sources.filter((s) => s.active && s.url).forEach((s) => jobs.push({ label: `source: ${s.name}`, url: s.url, tier: Number(s.tier) || 2, sourceName: s.name }));
 
   let managerInfo = null;
-  if (searchManagers && managersList.length) {
-    const { batch, from, to, total, batches } = rotatingBatch(managersList, Number(managerBatch));
+  if (searchManagers && watchlist.length) {
+    const { batch, from, to, total, batches } = rotatingBatch(watchlist, Number(managerBatch));
     managerInfo = { from, to, total, batches };
     batch.forEach((m) => jobs.push({ label: `manager: ${m}`, url: managerQuery(m, days), tier: 3 }));
   }

@@ -35,6 +35,7 @@ export default function ImpactPulseApp() {
   const [richPreviews, setRichPreviews] = useState(true);
 
   const [keywords, setKeywords] = useState(defaultKeywords);
+  const [managers, setManagers] = useState(managersList);
   const [sources, setSources] = useState(defaultSources.map((s) => ({ ...s })));
   const [regionsIn, setRegionsIn] = useState(defaultCriteria.regionsIn);
   const [regionsOut, setRegionsOut] = useState(defaultCriteria.regionsOut);
@@ -56,6 +57,7 @@ export default function ImpactPulseApp() {
         setRememberSeen(saved.rememberSeen ?? true); setSearchManagers(saved.searchManagers ?? true);
         setManagerBatch(saved.managerBatch ?? 25); setRichPreviews(saved.richPreviews ?? true);
         if (saved.keywords) setKeywords(saved.keywords);
+        if (Array.isArray(saved.managers)) setManagers(saved.managers);
         if (saved.sources) setSources(saved.sources);
         if (saved.regionsIn) setRegionsIn(saved.regionsIn);
         if (saved.regionsOut) setRegionsOut(saved.regionsOut);
@@ -68,10 +70,10 @@ export default function ImpactPulseApp() {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify({
         days, maxItems, rememberSeen, searchManagers, managerBatch, richPreviews,
-        keywords, sources, regionsIn, regionsOut, themes, rules,
+        keywords, managers, sources, regionsIn, regionsOut, themes, rules,
       }));
     } catch {}
-  }, [days, maxItems, rememberSeen, searchManagers, managerBatch, richPreviews, keywords, sources, regionsIn, regionsOut, themes, rules]);
+  }, [days, maxItems, rememberSeen, searchManagers, managerBatch, richPreviews, keywords, managers, sources, regionsIn, regionsOut, themes, rules]);
 
   const activeThemes = themes.filter((t) => t.on).map((t) => t.label);
   const criteriaBlock = useMemo(() => [
@@ -85,7 +87,7 @@ export default function ImpactPulseApp() {
 
   function resetConfig() {
     setDays(8); setMaxItems(200); setRememberSeen(true); setSearchManagers(true); setManagerBatch(25); setRichPreviews(true);
-    setKeywords(defaultKeywords); setSources(defaultSources.map((s) => ({ ...s })));
+    setKeywords(defaultKeywords); setManagers(managersList); setSources(defaultSources.map((s) => ({ ...s })));
     setRegionsIn(defaultCriteria.regionsIn); setRegionsOut(defaultCriteria.regionsOut);
     setThemes(defaultCriteria.themes.map((t) => ({ label: t, on: true }))); setRules(defaultCriteria.rules);
   }
@@ -97,7 +99,7 @@ export default function ImpactPulseApp() {
     try {
       const res = await fetch("/api/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keywords, sources, days, maxItems, criteriaBlock, rememberSeen, searchManagers, managerBatch, richPreviews }),
+        body: JSON.stringify({ keywords, sources, managers, days, maxItems, criteriaBlock, rememberSeen, searchManagers, managerBatch, richPreviews }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
@@ -196,30 +198,38 @@ export default function ImpactPulseApp() {
           </Panel>
 
           <Panel>
-            <SectionTitle n="C" title="Sources" sub="Curated feeds. Tier 1 = primary DFI announcements (best); when the same story appears in several, the highest tier wins." />
+            <SectionTitle n="C" title="Sources" sub="Direct publisher RSS feeds — separate from keywords. These give clean links, images, and higher precision. Tier 1 (primary DFI announcements) wins when the same story also appears in Google News. Rows without a URL are placeholders and do nothing until you add one." />
             <div className="space-y-2">
-              {sources.map((s, idx) => (
+              {sources.map((s, idx) => {
+                const status = !s.url ? { label: "needs URL", color: C.border } : s.active ? { label: "active", color: C.accent } : { label: "muted", color: C.muted };
+                return (
                 <div key={idx}>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={() => setSources(sources.map((x, i) => i === idx ? { ...x, active: !x.active } : x))} title={s.active ? "Active" : "Muted"} style={{ color: s.active ? C.accent : C.line }}><CircleDot size={18} /></button>
-                    <input value={s.name} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none" style={{ ...inputStyle, width: 220 }} placeholder="Name" />
-                    <input value={s.url} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none flex-1" style={{ ...inputStyle, minWidth: 180 }} placeholder="RSS URL" />
+                    <button onClick={() => setSources(sources.map((x, i) => i === idx ? { ...x, active: !x.active } : x))} title={s.active ? "Active" : "Muted"} style={{ color: s.active && s.url ? C.accent : C.line }}><CircleDot size={18} /></button>
+                    <input value={s.name} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none" style={{ ...inputStyle, width: 200 }} placeholder="Name" />
+                    <input value={s.url} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none flex-1" style={{ ...inputStyle, minWidth: 160 }} placeholder="RSS feed URL" />
                     <select value={s.tier} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, tier: +e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none" style={inputStyle}>
                       <option value={1}>Tier 1</option><option value={2}>Tier 2</option><option value={3}>Tier 3</option>
                     </select>
+                    <span className="text-xs" style={{ color: status.color, minWidth: 62 }}>{status.label}</span>
                     <button onClick={() => setSources(sources.filter((_, i) => i !== idx))} style={{ color: C.muted }}><X size={16} /></button>
                   </div>
                   {s.notes && !s.url && (
-                    <div className="text-xs mt-1 ml-7 flex items-start gap-1" style={{ color: C.border }}><AlertTriangle size={12} style={{ marginTop: 2, flexShrink: 0 }} /> <span>{s.notes}</span></div>
+                    <div className="text-xs mt-1 ml-7 flex items-start gap-1" style={{ color: C.muted }}><AlertTriangle size={12} style={{ marginTop: 2, flexShrink: 0, color: C.border }} /> <span>{s.notes}</span></div>
                   )}
                 </div>
-              ))}
+              );})}
             </div>
             <button onClick={() => setSources([...sources, { name: "", url: "", tier: 2, active: true, notes: "" }])} className="mt-3 inline-flex items-center gap-1 text-sm font-medium" style={{ color: C.accent }}><Plus size={15} /> Add source</button>
           </Panel>
 
           <Panel>
-            <SectionTitle n="D" title="Criteria" sub="What the filter step keeps." />
+            <SectionTitle n="D" title="Manager watchlist" sub={`${managers.length} fund managers, searched in a weekly-rotating batch of ${managerBatch} (set in Parameters). Only used when manager search is on.`} />
+            <ManagerWatchlist managers={managers} setManagers={setManagers} defaultList={managersList} />
+          </Panel>
+
+          <Panel>
+            <SectionTitle n="E" title="Criteria" sub="What the filter step keeps." />
             <ChipEditor label="Target regions (include)" items={regionsIn} setItems={setRegionsIn} tone={C.include} />
             <ChipEditor label="Exclude regions" items={regionsOut} setItems={setRegionsOut} tone={C.exclude} />
             <div className="mt-4">
@@ -255,7 +265,7 @@ export default function ImpactPulseApp() {
 
         {result && (
           <Panel>
-            <SectionTitle n="E" title="Digest" sub={
+            <SectionTitle n="F" title="Digest" sub={
               `${result.collectedCount} collected · ${result.included.length} funds` +
               (result.borderline?.length ? ` · ${result.borderline.length} borderline` : "") +
               (result.managerInfo ? ` · managers ${result.managerInfo.from + 1}–${result.managerInfo.to} of ${result.managerInfo.total}` : "") +
@@ -304,7 +314,7 @@ export default function ImpactPulseApp() {
 
         <p className="text-xs mt-6" style={{ color: C.muted }}>
           Filter model is set by the FILTER_MODEL env var (default claude-sonnet-5). Filter calls run server-side — the Anthropic key never reaches the browser.
-          Manager watchlist ({managersList.length}) is searched in a weekly-rotating batch to stay within serverless limits. Settings are saved in this browser.
+          Manager watchlist ({managers.length}) is searched in a weekly-rotating batch to stay within serverless limits. Settings are saved in this browser.
           "Copy links" gives the selected stories' URLs, one per line, ready to paste into LinkedIn.
         </p>
       </div>
@@ -337,6 +347,83 @@ function Card({ item, tone }) {
         </div>
         {item.alsoCoveredBy?.length > 0 && <div className="text-xs mt-1" style={{ color: "#6f7a75" }}>Also covered by {item.alsoCoveredBy.join(", ")}</div>}
       </div>
+    </div>
+  );
+}
+
+function ManagerWatchlist({ managers, setManagers, defaultList }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [draft, setDraft] = useState("");
+  const [bulk, setBulk] = useState(null); // string when in bulk-edit mode
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return managers
+      .map((name, i) => ({ name, i }))
+      .filter(({ name }) => !needle || name.toLowerCase().includes(needle));
+  }, [managers, q]);
+
+  function add() {
+    const v = draft.trim();
+    if (!v) return;
+    if (!managers.some((m) => m.toLowerCase() === v.toLowerCase())) setManagers([...managers, v]);
+    setDraft("");
+  }
+  function removeAt(i) { setManagers(managers.filter((_, idx) => idx !== i)); }
+
+  if (bulk !== null) {
+    return (
+      <div>
+        <div className="text-sm mb-2" style={{ color: C.muted }}>One name per line. Saving replaces the whole list.</div>
+        <textarea value={bulk} onChange={(e) => setBulk(e.target.value)} rows={12}
+          className="w-full px-3 py-2 rounded border text-sm outline-none" style={{ ...inputStyle, fontFamily: "ui-monospace, Menlo, monospace" }} />
+        <div className="flex gap-2 mt-2">
+          <button onClick={() => { const list = bulk.split("\n").map((s) => s.trim()).filter(Boolean); const seen = new Set(); const dedup = list.filter((n) => { const k = n.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }); setManagers(dedup); setBulk(null); }}
+            className="text-sm font-semibold px-3 py-1.5 rounded" style={{ background: C.accent, color: C.onAccent }}>Save list</button>
+          <button onClick={() => setBulk(null)} className="text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line, color: C.text }}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={() => setOpen(!open)} className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: C.accent }}>
+          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />} {open ? "Hide list" : "View & edit list"}
+        </button>
+        {open && (
+          <>
+            <button onClick={() => setBulk(managers.join("\n"))} className="text-xs" style={{ color: C.muted }}>Bulk edit</button>
+            <button onClick={() => setManagers(defaultList)} className="text-xs" style={{ color: C.muted }}>Reset to default ({defaultList.length})</button>
+          </>
+        )}
+      </div>
+
+      {open && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2 flex-wrap mb-2">
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Filter ${managers.length} names…`}
+              className="px-2 py-1.5 rounded border text-sm outline-none" style={{ ...inputStyle, width: 220 }} />
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Add a manager + Enter"
+              className="px-2 py-1.5 rounded border text-sm outline-none flex-1" style={{ ...inputStyle, minWidth: 180 }} />
+            <button onClick={add} className="inline-flex items-center gap-1 text-sm font-medium px-2.5 py-1.5 rounded border" style={{ borderColor: C.line, color: C.text }}><Plus size={14} /> Add</button>
+          </div>
+          <div style={{ maxHeight: 260, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>
+            {filtered.length === 0 && <div className="text-sm p-3" style={{ color: C.muted }}>No matches.</div>}
+            {filtered.map(({ name, i }) => (
+              <div key={i} className="flex items-center justify-between px-3 py-1.5" style={{ borderBottom: `1px solid ${C.line}` }}>
+                <span className="text-sm">{name}</span>
+                <button onClick={() => removeAt(i)} title="Remove" style={{ color: C.muted }}><X size={14} /></button>
+              </div>
+            ))}
+          </div>
+          <div className="text-xs mt-2" style={{ color: C.muted }}>
+            {q.trim() ? `${filtered.length} shown · ` : ""}{managers.length} total
+          </div>
+        </div>
+      )}
     </div>
   );
 }
