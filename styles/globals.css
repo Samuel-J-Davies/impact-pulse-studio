@@ -1,6 +1,25 @@
+/* Tameo brand typeface — Euclid Circular A */
+@font-face { font-family: 'Euclid Circular A'; font-weight: 300; font-style: normal; font-display: swap;
+  src: url('/fonts/EuclidCircularA-Light.woff2') format('woff2'), url('/fonts/EuclidCircularA-Light.woff') format('woff'); }
+@font-face { font-family: 'Euclid Circular A'; font-weight: 400; font-style: normal; font-display: swap;
+  src: url('/fonts/EuclidCircularA-Regular.woff2') format('woff2'), url('/fonts/EuclidCircularA-Regular.woff') format('woff'); }
+@font-face { font-family: 'Euclid Circular A'; font-weight: 500; font-style: normal; font-display: swap;
+  src: url('/fonts/EuclidCircularA-Medium.woff2') format('woff2'), url('/fonts/EuclidCircularA-Medium.woff') format('woff'); }
+@font-face { font-family: 'Euclid Circular A'; font-weight: 600; font-style: normal; font-display: swap;
+  src: url('/fonts/EuclidCircularA-Semibold.woff2') format('woff2'), url('/fonts/EuclidCircularA-Semibold.woff') format('woff'); }
+@font-face { font-family: 'Euclid Circular A'; font-weight: 700; font-style: normal; font-display: swap;
+  src: url('/fonts/EuclidCircularA-Bold.woff2') format('woff2'), url('/fonts/EuclidCircularA-Bold.woff') format('woff'); }
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { -webkit-font-smoothing: antialiased; }
+body { -webkit-font-smoothing: antialiased; background: #000000; }
+
+input, textarea, select { background: #0e1110; color: #f1f6f2; }
+input::placeholder, textarea::placeholder { color: #6f7a75; }
+select option { background: #141615; color: #f1f6f2; }
+input[type="checkbox"] { accent-color: #8ad98a; width: 15px; height: 15px; }
+details > summary { list-style: revert; }
+::selection { background: #8ad98a; color: #06130b; }
 
 .min-h-screen { min-height: 100vh; }
 .mx-auto { margin-left: auto; margin-right: auto; }

@@ -6,11 +6,24 @@ import defaultSources from "../config/sources.json";
 import defaultCriteria from "../config/criteria.json";
 import managersList from "../config/managers.json";
 
+// Palette sampled from Tameo's rebranded (dark) site + brand deck.
 const C = {
-  ink: "#1e2b27", page: "#eaeeea", panel: "#ffffff", line: "#dbe1dc", muted: "#5f6f68",
-  accent: "#3f8f5c", include: "#57b26a", border: "#c99a2e", exclude: "#b34a40", chipOn: "#e3efe7",
+  bg: "#000000",
+  surface: "#141615",
+  inset: "#1f2321",
+  line: "#2a2f2c",
+  text: "#f1f6f2",
+  muted: "#8b9490",
+  accent: "#8ad98a",     // bright brand green
+  accentDeep: "#6cc27c",
+  onAccent: "#06130b",
+  include: "#8ad98a",
+  border: "#d9a441",     // amber — borderline (functional)
+  exclude: "#e75655",    // brand coral
+  chipBg: "#18231c",
+  chipText: "#cde9d3",
 };
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+const SANS = "'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const STORE_KEY = "impactpulse.config.v1";
 
 export default function ImpactPulseApp() {
@@ -35,7 +48,6 @@ export default function ImpactPulseApp() {
   const [copied, setCopied] = useState("");
   const [collapsed, setCollapsed] = useState(false);
 
-  // Persist config across visits (real browser storage — this is a deployed app, not a sandbox).
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
@@ -105,10 +117,7 @@ export default function ImpactPulseApp() {
     if (result.borderline?.length) md += "\n\n**Borderline — review**\n\n" + result.borderline.map(row).join("\n");
     return md;
   }
-  function selectedItems() {
-    if (!result) return [];
-    return [...(result.included || []), ...(result.borderline || [])];
-  }
+  function selectedItems() { return result ? [...(result.included || []), ...(result.borderline || [])] : []; }
   function copy(kind) {
     let text = "";
     if (kind === "links") text = selectedItems().map((it) => it.link).join("\n");
@@ -119,16 +128,34 @@ export default function ImpactPulseApp() {
   }
 
   return (
-    <div style={{ background: C.page, color: C.ink, fontFamily: SANS }} className="min-h-screen p-5 sm:p-8">
+    <div style={{ background: C.bg, color: C.text, fontFamily: SANS, minHeight: "100vh" }}>
       <Head><title>Impact Pulse — News Digest</title><meta name="robots" content="noindex" /></Head>
-      <div className="mx-auto" style={{ maxWidth: 980 }}>
-        <Header onReset={resetConfig} />
 
-        <div style={{ display: collapsed ? "block" : "none" }}>
+      {/* Site-style top bar: white logo on black, hairline divider */}
+      <div style={{ borderBottom: `1px solid ${C.line}` }}>
+        <div className="mx-auto flex items-center justify-between" style={{ maxWidth: 980, padding: "16px 20px" }}>
+          <img src="/tameo-logo-white.svg" alt="Tameo" style={{ height: 24, width: "auto" }} />
+          <span className="text-xs tracking-widest uppercase" style={{ color: C.muted, letterSpacing: "0.12em" }}>Impact Pulse</span>
+        </div>
+      </div>
+
+      <div className="mx-auto p-5 sm:p-8" style={{ maxWidth: 980 }}>
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase mb-3" style={{ color: C.accent, letterSpacing: "0.14em", fontWeight: 600 }}>News monitoring</div>
+            <button onClick={resetConfig} title="Reset to defaults" className="inline-flex items-center gap-1 text-xs" style={{ color: C.muted }}><RotateCcw size={12} /> Reset</button>
+          </div>
+          <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.08, color: "#fff" }}>News Digest</h1>
+          <p className="mt-2 text-sm" style={{ color: C.muted, maxWidth: 620 }}>
+            Search keyword feeds, curated sources, and a fund-manager watchlist; filter for genuine emerging-market impact fund launches; get a deduplicated digest with links — in one run.
+          </p>
+        </div>
+
+        {collapsed && (
           <button onClick={() => setCollapsed(false)} className="inline-flex items-center gap-1 text-sm font-medium mb-4" style={{ color: C.accent }}>
             <ChevronRight size={16} /> Show settings
           </button>
-        </div>
+        )}
 
         <div style={{ display: collapsed ? "none" : "block" }}>
           <Panel>
@@ -136,18 +163,18 @@ export default function ImpactPulseApp() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <Field label="Look-back window">
                 <div className="flex items-center gap-2">
-                  <input type="number" value={days} min={1} max={90} onChange={(e) => setDays(+e.target.value)} className="w-20 px-2 py-1 rounded border outline-none" style={{ borderColor: C.line }} />
+                  <input type="number" value={days} min={1} max={90} onChange={(e) => setDays(+e.target.value)} className="w-20 px-2 py-1 rounded border outline-none" style={inputStyle} />
                   <span className="text-sm" style={{ color: C.muted }}>days</span>
                 </div>
               </Field>
               <Field label="Max items screened">
-                <input type="number" value={maxItems} min={10} max={500} onChange={(e) => setMaxItems(+e.target.value)} className="w-24 px-2 py-1 rounded border outline-none" style={{ borderColor: C.line }} />
+                <input type="number" value={maxItems} min={10} max={500} onChange={(e) => setMaxItems(+e.target.value)} className="w-24 px-2 py-1 rounded border outline-none" style={inputStyle} />
               </Field>
               <Field label="Skip previously-seen">
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={rememberSeen} onChange={(e) => setRememberSeen(e.target.checked)} />{rememberSeen ? "On" : "Off"}</label>
               </Field>
               <Field label="Rich link previews">
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={richPreviews} onChange={(e) => setRichPreviews(e.target.checked)} />{richPreviews ? "On (images + real links)" : "Off (faster)"}</label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={richPreviews} onChange={(e) => setRichPreviews(e.target.checked)} />{richPreviews ? "On (images + links)" : "Off (faster)"}</label>
               </Field>
               <Field label="Search manager watchlist">
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={searchManagers} onChange={(e) => setSearchManagers(e.target.checked)} />{searchManagers ? "On" : "Off"}</label>
@@ -155,7 +182,7 @@ export default function ImpactPulseApp() {
               {searchManagers && (
                 <Field label={`Managers per run (of ${managersList.length})`}>
                   <div className="flex items-center gap-2">
-                    <input type="number" value={managerBatch} min={5} max={80} onChange={(e) => setManagerBatch(+e.target.value)} className="w-20 px-2 py-1 rounded border outline-none" style={{ borderColor: C.line }} />
+                    <input type="number" value={managerBatch} min={5} max={80} onChange={(e) => setManagerBatch(+e.target.value)} className="w-20 px-2 py-1 rounded border outline-none" style={inputStyle} />
                     <span className="text-xs" style={{ color: C.muted }}>rotates weekly</span>
                   </div>
                 </Field>
@@ -174,10 +201,10 @@ export default function ImpactPulseApp() {
               {sources.map((s, idx) => (
                 <div key={idx}>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={() => setSources(sources.map((x, i) => i === idx ? { ...x, active: !x.active } : x))} title={s.active ? "Active" : "Muted"} style={{ color: s.active ? C.include : C.line }}><CircleDot size={18} /></button>
-                    <input value={s.name} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none" style={{ borderColor: C.line, width: 220 }} placeholder="Name" />
-                    <input value={s.url} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none flex-1" style={{ borderColor: C.line, minWidth: 180 }} placeholder="RSS URL" />
-                    <select value={s.tier} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, tier: +e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none" style={{ borderColor: C.line }}>
+                    <button onClick={() => setSources(sources.map((x, i) => i === idx ? { ...x, active: !x.active } : x))} title={s.active ? "Active" : "Muted"} style={{ color: s.active ? C.accent : C.line }}><CircleDot size={18} /></button>
+                    <input value={s.name} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none" style={{ ...inputStyle, width: 220 }} placeholder="Name" />
+                    <input value={s.url} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none flex-1" style={{ ...inputStyle, minWidth: 180 }} placeholder="RSS URL" />
+                    <select value={s.tier} onChange={(e) => setSources(sources.map((x, i) => i === idx ? { ...x, tier: +e.target.value } : x))} className="px-2 py-1 rounded border text-sm outline-none" style={inputStyle}>
                       <option value={1}>Tier 1</option><option value={2}>Tier 2</option><option value={3}>Tier 3</option>
                     </select>
                     <button onClick={() => setSources(sources.filter((_, i) => i !== idx))} style={{ color: C.muted }}><X size={16} /></button>
@@ -199,13 +226,13 @@ export default function ImpactPulseApp() {
               <div className="text-sm font-semibold mb-2">Impact themes</div>
               <div className="flex flex-wrap gap-2">
                 {themes.map((t, idx) => (
-                  <button key={t.label} onClick={() => setThemes(themes.map((x, i) => i === idx ? { ...x, on: !x.on } : x))} className="px-3 py-1 rounded-full text-sm border" style={{ borderColor: t.on ? C.accent : C.line, background: t.on ? C.chipOn : "transparent", color: t.on ? C.ink : C.muted }}>{t.label}</button>
+                  <button key={t.label} onClick={() => setThemes(themes.map((x, i) => i === idx ? { ...x, on: !x.on } : x))} className="px-3 py-1 rounded-full text-sm border" style={{ borderColor: t.on ? C.accent : C.line, background: t.on ? C.chipBg : "transparent", color: t.on ? C.chipText : C.muted }}>{t.label}</button>
                 ))}
               </div>
             </div>
             <div className="mt-4">
               <div className="text-sm font-semibold mb-2">Include / exclude rules</div>
-              <textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={4} className="w-full px-3 py-2 rounded border text-sm outline-none leading-relaxed" style={{ borderColor: C.line }} />
+              <textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={4} className="w-full px-3 py-2 rounded border text-sm outline-none leading-relaxed" style={inputStyle} />
             </div>
           </Panel>
         </div>
@@ -218,7 +245,7 @@ export default function ImpactPulseApp() {
                 {keywords.filter(Boolean).length} keywords · {activeSourceCount} sources{searchManagers ? ` · ${managerBatch} managers` : ""} · last {days} days
               </div>
             </div>
-            <button onClick={run} disabled={running} className="inline-flex items-center gap-2 px-5 py-2.5 rounded text-sm font-semibold text-white" style={{ background: running ? C.muted : C.ink }}>
+            <button onClick={run} disabled={running} className="inline-flex items-center gap-2 px-5 py-2.5 rounded text-sm font-semibold" style={{ background: running ? C.inset : C.accent, color: running ? C.muted : C.onAccent }}>
               <Play size={16} /> {running ? "Working…" : "Run search + filter"}
             </button>
           </div>
@@ -260,13 +287,13 @@ export default function ImpactPulseApp() {
 
             {selectedItems().length > 0 && (
               <div className="flex items-center gap-2 mt-5 flex-wrap">
-                <button onClick={() => copy("links")} className="inline-flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded text-white" style={{ background: C.ink }}>
+                <button onClick={() => copy("links")} className="inline-flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded" style={{ background: C.accent, color: C.onAccent }}>
                   {copied === "links" ? <Check size={14} /> : <Link2 size={14} />} {copied === "links" ? "Copied" : "Copy links"}
                 </button>
-                <button onClick={() => copy("titledLinks")} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line }}>
+                <button onClick={() => copy("titledLinks")} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line, color: C.text }}>
                   {copied === "titledLinks" ? <Check size={14} /> : <Copy size={14} />} {copied === "titledLinks" ? "Copied" : "Copy titles + links"}
                 </button>
-                <button onClick={() => copy("table")} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line }}>
+                <button onClick={() => copy("table")} className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border" style={{ borderColor: C.line, color: C.text }}>
                   {copied === "table" ? <Check size={14} /> : <Copy size={14} />} {copied === "table" ? "Copied" : "Copy table"}
                 </button>
                 <span className="text-xs" style={{ color: C.muted }}>{selectedItems().length} link{selectedItems().length === 1 ? "" : "s"}</span>
@@ -278,23 +305,25 @@ export default function ImpactPulseApp() {
         <p className="text-xs mt-6" style={{ color: C.muted }}>
           Filter model is set by the FILTER_MODEL env var (default claude-sonnet-5). Filter calls run server-side — the Anthropic key never reaches the browser.
           Manager watchlist ({managersList.length}) is searched in a weekly-rotating batch to stay within serverless limits. Settings are saved in this browser.
-          "Copy links" gives you the selected stories' URLs, one per line, ready to paste into LinkedIn.
+          "Copy links" gives the selected stories' URLs, one per line, ready to paste into LinkedIn.
         </p>
       </div>
     </div>
   );
 }
 
+const inputStyle = { borderColor: C.line, background: "#0e1110", color: C.text };
+
 function Card({ item, tone }) {
   return (
-    <div className="rounded" style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: `1px solid ${C.line}` }}>
+    <div style={{ display: "flex", gap: 12, padding: "13px 0", borderBottom: `1px solid ${C.line}` }}>
       {item.image && (
         <img src={item.image} alt="" width={116} height={78}
           style={{ width: 116, height: 78, objectFit: "cover", borderRadius: 6, flexShrink: 0, borderLeft: `3px solid ${tone}` }}
           onError={(e) => { e.target.style.display = "none"; }} />
       )}
       <div style={{ minWidth: 0, flex: 1 }}>
-        <a href={item.link} target="_blank" rel="noreferrer" style={{ color: C.ink, fontWeight: 600, fontSize: 15, lineHeight: 1.35, textDecoration: "none" }} className="hover-underline">
+        <a href={item.link} target="_blank" rel="noreferrer" className="hover-underline" style={{ color: C.text, fontWeight: 600, fontSize: 15, lineHeight: 1.35, textDecoration: "none" }}>
           {item.title} <ExternalLink size={12} style={{ display: "inline", verticalAlign: "middle", color: C.muted }} />
         </a>
         <div className="text-xs mt-1" style={{ color: C.muted }}>
@@ -303,42 +332,22 @@ function Card({ item, tone }) {
         {item.description && <div className="text-sm mt-1" style={{ color: C.muted, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description}</div>}
         <div className="mt-2 flex flex-wrap gap-1">
           {[item.manager, item.fund, item.region, item.theme].filter(Boolean).map((v, i) => (
-            <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: C.chipOn, color: C.ink }}>{v}</span>
+            <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: C.chipBg, color: C.chipText }}>{v}</span>
           ))}
         </div>
-        {item.alsoCoveredBy?.length > 0 && <div className="text-xs mt-1" style={{ color: "#8a988f" }}>Also covered by {item.alsoCoveredBy.join(", ")}</div>}
+        {item.alsoCoveredBy?.length > 0 && <div className="text-xs mt-1" style={{ color: "#6f7a75" }}>Also covered by {item.alsoCoveredBy.join(", ")}</div>}
       </div>
-    </div>
-  );
-}
-
-function Header({ onReset }) {
-  return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 mb-3">
-          <div style={{ width: 10, height: 10, borderRadius: 999, background: C.include }} />
-          <div style={{ width: 10, height: 10, borderRadius: 999, background: "#3a3aa0" }} />
-          <div style={{ width: 10, height: 10, borderRadius: 999, background: C.exclude }} />
-          <span className="text-xs tracking-widest uppercase ml-1" style={{ color: C.muted }}>Tameo · Impact Pulse</span>
-        </div>
-        <button onClick={onReset} title="Reset to defaults" className="inline-flex items-center gap-1 text-xs" style={{ color: C.muted }}><RotateCcw size={12} /> Reset</button>
-      </div>
-      <h1 style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1 }}>News Digest</h1>
-      <p className="mt-2 text-sm" style={{ color: C.muted, maxWidth: 620 }}>
-        Search keyword feeds, curated sources, and a fund-manager watchlist; filter for genuine emerging-market impact fund launches; get a deduplicated digest with links — in one run.
-      </p>
     </div>
   );
 }
 
 function Panel({ children }) {
-  return <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12 }} className="p-5 sm:p-6 mb-4">{children}</div>;
+  return <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12 }} className="p-5 sm:p-6 mb-4">{children}</div>;
 }
 function SectionTitle({ n, title, sub }) {
   return (
     <div className="mb-4">
-      <div className="flex items-baseline gap-2"><span className="text-xs font-mono" style={{ color: C.accent }}>{n}</span><h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em" }}>{title}</h2></div>
+      <div className="flex items-baseline gap-2"><span className="text-xs font-mono" style={{ color: C.accent }}>{n}</span><h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", color: "#fff" }}>{title}</h2></div>
       {sub && <p className="text-sm mt-1" style={{ color: C.muted }}>{sub}</p>}
     </div>
   );
@@ -352,11 +361,11 @@ function ChipEditor({ label, items, setItems, tone, placeholder = "add + Enter" 
       {label && <div className="text-sm font-semibold mb-2">{label}</div>}
       <div className="flex flex-wrap gap-2 items-center">
         {items.map((it, i) => (
-          <span key={it + i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm" style={{ background: C.chipOn, color: C.ink, borderLeft: `3px solid ${tone}` }}>
+          <span key={it + i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm" style={{ background: C.chipBg, color: C.chipText, borderLeft: `3px solid ${tone}` }}>
             {it}<button onClick={() => setItems(items.filter((_, idx) => idx !== i))} style={{ color: C.muted }}><X size={13} /></button>
           </span>
         ))}
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && draft.trim()) { setItems([...items, draft.trim()]); setDraft(""); } }} placeholder={placeholder} className="px-2 py-1 rounded border text-sm outline-none" style={{ borderColor: C.line, width: 150 }} />
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && draft.trim()) { setItems([...items, draft.trim()]); setDraft(""); } }} placeholder={placeholder} className="px-2 py-1 rounded border text-sm outline-none" style={{ ...inputStyle, width: 150 }} />
       </div>
     </div>
   );
