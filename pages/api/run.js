@@ -3,7 +3,7 @@ import { filterUnseen, markSeen } from '../../lib/dedup';
 import { fetchPreview } from '../../lib/preview';
 import managersList from '../../config/managers.json';
 
-export const config = { maxDuration: 60 }; // Vercel Hobby cap; Pro allows more headroom
+export const config = { maxDuration: 300 }; // Vercel enforces your plan's actual ceiling regardless (Hobby: 60s, Pro: up to 300s+) — requesting 300 here does no harm on Hobby, it just gets capped.
 
 // Default filter model. Override with FILTER_MODEL env var. Verify the exact
 // string against your Anthropic console — model names change over time.
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
   const {
     keywords = [], sources = [], days = 8, maxItems = 200, criteriaBlock = '',
-    rememberSeen = true, searchManagers = true, managerBatch = 25, richPreviews = true,
+    rememberSeen = true, searchManagers = true, managerBatch = 0, richPreviews = true,
     managers = null,
   } = req.body || {};
 
@@ -66,14 +66,17 @@ export default async function handler(req, res) {
 
   let managerInfo = null;
   if (searchManagers && watchlist.length) {
-    const { batch, from, to, total, batches } = rotatingBatch(watchlist, Number(managerBatch));
-    managerInfo = { from, to, total, batches };
+    const effectiveBatch = Number(managerBatch) > 0 ? Number(managerBatch) : watchlist.length;
+    const { batch, from, to, total, batches } = rotatingBatch(watchlist, effectiveBatch);
+    managerInfo = { from, to, total, batches, full: batches <= 1 };
     batch.forEach((m) => jobs.push({ label: `manager: ${m}`, url: managerQuery(m, days), tier: 3 }));
   }
   if (!jobs.length) return res.status(400).json({ error: 'Nothing to search. Add a keyword or source, or enable manager search.' });
 
   // ---- 2. Fetch all feeds with bounded concurrency ----
-  const fetched = await pool(jobs, async (job) => ({ job, ...(await fetchFeed(job.url)) }), 8);
+  // Higher concurrency matters once the manager watchlist is searched in full (400+ requests) —
+  // at 8, that's 50+ sequential batches; at 16, it roughly halves wall time.
+  const fetched = await pool(jobs, async (job) => ({ job, ...(await fetchFeed(job.url)) }), 16);
   const feedErrors = fetched.filter((r) => r.error).map((r) => ({ source: r.job.label, error: r.error }));
 
   // ---- 3. Dedup by normalized link, keep the best-tier copy of exact-URL dupes ----

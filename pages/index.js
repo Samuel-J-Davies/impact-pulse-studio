@@ -31,7 +31,7 @@ export default function ImpactPulseApp() {
   const [maxItems, setMaxItems] = useState(200);
   const [rememberSeen, setRememberSeen] = useState(true);
   const [searchManagers, setSearchManagers] = useState(true);
-  const [managerBatch, setManagerBatch] = useState(25);
+  const [managerBatch, setManagerBatch] = useState(0); // 0 = search the whole watchlist every run
   const [richPreviews, setRichPreviews] = useState(true);
 
   const [keywords, setKeywords] = useState(defaultKeywords);
@@ -55,7 +55,7 @@ export default function ImpactPulseApp() {
       if (saved) {
         setDays(saved.days ?? 8); setMaxItems(saved.maxItems ?? 200);
         setRememberSeen(saved.rememberSeen ?? true); setSearchManagers(saved.searchManagers ?? true);
-        setManagerBatch(saved.managerBatch ?? 25); setRichPreviews(saved.richPreviews ?? true);
+        setManagerBatch(saved.managerBatch ?? 0); setRichPreviews(saved.richPreviews ?? true);
         if (saved.keywords) setKeywords(saved.keywords);
         if (Array.isArray(saved.managers)) setManagers(saved.managers);
         if (saved.sources) {
@@ -91,7 +91,7 @@ export default function ImpactPulseApp() {
   const activeSourceCount = sources.filter((s) => s.active && s.url).length;
 
   function resetConfig() {
-    setDays(8); setMaxItems(200); setRememberSeen(true); setSearchManagers(true); setManagerBatch(25); setRichPreviews(true);
+    setDays(8); setMaxItems(200); setRememberSeen(true); setSearchManagers(true); setManagerBatch(0); setRichPreviews(true);
     setKeywords(defaultKeywords); setManagers(managersList); setSources(defaultSources.map((s) => ({ ...s })));
     setRegionsIn(defaultCriteria.regionsIn); setRegionsOut(defaultCriteria.regionsOut);
     setThemes(defaultCriteria.themes.map((t) => ({ label: t, on: true }))); setRules(defaultCriteria.rules);
@@ -99,7 +99,9 @@ export default function ImpactPulseApp() {
 
   async function run() {
     setError(""); setResult(null); setRunning(true); setCollapsed(true);
-    setStage(searchManagers ? "Searching keywords, sources, and a batch of managers…" : "Searching keywords and sources…");
+    setStage(searchManagers
+      ? (managerBatch > 0 ? "Searching keywords, sources, and a batch of managers…" : `Searching keywords, sources, and all ${managers.length} managers…`)
+      : "Searching keywords and sources…");
     const t = setTimeout(() => setStage(richPreviews ? "Filtering, clustering duplicates, building previews…" : "Filtering and clustering duplicates…"), 4000);
     try {
       const res = await fetch("/api/run", {
@@ -189,8 +191,12 @@ export default function ImpactPulseApp() {
               {searchManagers && (
                 <Field label={`Managers per run (of ${managersList.length})`}>
                   <div className="flex items-center gap-2">
-                    <input type="number" value={managerBatch} min={5} max={80} onChange={(e) => setManagerBatch(+e.target.value)} className="w-20 px-2 py-1 rounded border outline-none" style={inputStyle} />
-                    <span className="text-xs" style={{ color: C.muted }}>rotates weekly</span>
+                    <input type="number" value={managerBatch} min={0} max={managersList.length}
+                      onChange={(e) => setManagerBatch(Math.max(0, +e.target.value))}
+                      className="w-20 px-2 py-1 rounded border outline-none" style={inputStyle} />
+                    <span className="text-xs" style={{ color: C.muted }}>
+                      {managerBatch <= 0 ? "0 = search all every run" : `rotates through all ${managersList.length}`}
+                    </span>
                   </div>
                 </Field>
               )}
@@ -229,7 +235,13 @@ export default function ImpactPulseApp() {
           </Panel>
 
           <Panel>
-            <SectionTitle n="D" title="Manager watchlist" sub={`${managers.length} fund managers, searched in a weekly-rotating batch of ${managerBatch} (set in Parameters). Only used when manager search is on.`} />
+            <SectionTitle n="D" title="Manager watchlist" sub={
+              searchManagers
+                ? (managerBatch > 0
+                    ? `${managers.length} fund managers · this run searches a rotating batch of ${managerBatch} (set in Parameters)`
+                    : `${managers.length} fund managers · searched in full every run`)
+                : `${managers.length} fund managers, saved but not searched — turn on "Search manager watchlist" in Parameters to use it.`
+            } />
             <ManagerWatchlist managers={managers} setManagers={setManagers} defaultList={managersList} />
           </Panel>
 
@@ -257,7 +269,8 @@ export default function ImpactPulseApp() {
             <div>
               <div className="text-sm font-semibold">Ready to run</div>
               <div className="text-sm" style={{ color: C.muted }}>
-                {keywords.filter(Boolean).length} keywords · {activeSourceCount} sources{searchManagers ? ` · ${managerBatch} managers` : ""} · last {days} days
+                {keywords.filter(Boolean).length} keywords · {activeSourceCount} sources
+                {searchManagers ? ` · ${managerBatch > 0 ? managerBatch : managers.length} managers${managerBatch > 0 ? "" : " (all)"}` : ""} · last {days} days
               </div>
             </div>
             <button onClick={run} disabled={running} className="inline-flex items-center gap-2 px-5 py-2.5 rounded text-sm font-semibold" style={{ background: running ? C.inset : C.accent, color: running ? C.muted : C.onAccent }}>
@@ -273,7 +286,7 @@ export default function ImpactPulseApp() {
             <SectionTitle n="F" title="Digest" sub={
               `${result.collectedCount} collected · ${result.included.length} funds` +
               (result.borderline?.length ? ` · ${result.borderline.length} borderline` : "") +
-              (result.managerInfo ? ` · managers ${result.managerInfo.from + 1}–${result.managerInfo.to} of ${result.managerInfo.total}` : "") +
+              (result.managerInfo ? (result.managerInfo.full ? ` · all ${result.managerInfo.total} managers searched` : ` · managers ${result.managerInfo.from + 1}–${result.managerInfo.to} of ${result.managerInfo.total}`) : "") +
               (result.persistentDedup ? "" : " · repeat-run memory off")
             } />
 
@@ -319,8 +332,8 @@ export default function ImpactPulseApp() {
 
         <p className="text-xs mt-6" style={{ color: C.muted }}>
           Filter model is set by the FILTER_MODEL env var (default claude-sonnet-5). Filter calls run server-side — the Anthropic key never reaches the browser.
-          Manager watchlist ({managers.length}) is searched in a weekly-rotating batch to stay within serverless limits. Settings are saved in this browser.
-          "Copy links" gives the selected stories' URLs, one per line, ready to paste into LinkedIn.
+          Manager watchlist ({managers.length}) searches everyone every run by default — set "Managers per run" above 0 to rotate through a smaller batch instead if a full run ever times out on your Vercel plan.
+          Settings are saved in this browser. "Copy links" gives the selected stories' URLs, one per line, ready to paste into LinkedIn.
         </p>
       </div>
     </div>
